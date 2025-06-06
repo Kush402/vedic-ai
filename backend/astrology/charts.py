@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytz
 from timezonefinder import TimezoneFinder
 from typing import List, Dict, Any
-from .models import ChartHouse
+from .models import ChartHouse, NakshatraInfo, DashaInfo, DashaPeriod
 import os
 
 # --- Configuration & Constants ---
@@ -50,6 +50,27 @@ if EPHE_PATH:
 # Vedic Astrology uses Lahiri Ayanamsa
 swe.set_sid_mode(swe.SIDM_LAHIRI)
 
+# Nakshatra list in order
+NAKSHATRAS = [
+    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira",
+    "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha",
+    "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati",
+    "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha",
+    "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada",
+    "Uttara Bhadrapada", "Revati"
+]
+
+# Vimshottari Dasha constants
+DASHA_ORDER = [
+    "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu",
+    "Jupiter", "Saturn", "Mercury"
+]
+
+DASHA_YEARS = {
+    "Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10,
+    "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17
+}
+
 PLANET_NAMES = {
     swe.SUN: "Sun",
     swe.MOON: "Moon",
@@ -74,7 +95,120 @@ ZODIAC_SIGNS = [
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
 ]
 
+# Planetary Strength Constants
+EXALTATION_SIGNS = {
+    swe.SUN: "Aries",
+    swe.MOON: "Taurus",
+    swe.MARS: "Capricorn",
+    swe.MERCURY: "Virgo",
+    swe.JUPITER: "Cancer",
+    swe.VENUS: "Pisces",
+    swe.SATURN: "Libra"
+}
+
+DEBILITATION_SIGNS = {
+    swe.SUN: "Libra",
+    swe.MOON: "Scorpio",
+    swe.MARS: "Cancer",
+    swe.MERCURY: "Pisces",
+    swe.JUPITER: "Capricorn",
+    swe.VENUS: "Virgo",
+    swe.SATURN: "Aries"
+}
+
+OWN_SIGNS = {
+    swe.SUN: ["Leo"],
+    swe.MOON: ["Cancer"],
+    swe.MARS: ["Aries", "Scorpio"],
+    swe.MERCURY: ["Gemini", "Virgo"],
+    swe.JUPITER: ["Sagittarius", "Pisces"],
+    swe.VENUS: ["Taurus", "Libra"],
+    swe.SATURN: ["Capricorn", "Aquarius"]
+}
+
+COMBUSTION_LIMITS = {
+    swe.MERCURY: 12,
+    swe.VENUS: 10,
+    swe.MARS: 17,
+    swe.JUPITER: 11,
+    swe.SATURN: 15
+}
+
+# Graha Drishti rules (based on sign distance)
+ASPECT_RULES = {
+    swe.SUN:    [7],
+    swe.MOON:   [7],
+    swe.MERCURY:[7],
+    swe.JUPITER:[5, 7, 9],
+    swe.VENUS:  [7],
+    swe.SATURN: [3, 7, 10],
+    swe.MARS:   [4, 7, 8]
+}
+
 # --- Helper Functions ---
+
+def get_nakshatra_info(longitude: float) -> dict:
+    """Returns nakshatra name and pada from moon longitude."""
+    index = int(longitude / (360 / 27))
+    nakshatra = NAKSHATRAS[index]
+    pada = int((longitude % (360 / 27)) / (360 / 108)) + 1  # 4 padas per nakshatra
+    return {
+        "nakshatra": nakshatra,
+        "pada": pada
+    }
+
+from datetime import datetime, timedelta
+
+def calculate_vimshottari_dasha(moon_long: float, dob: str) -> dict:
+    """Returns current Maha Dasha and sequence from birth using Moon longitude."""
+    # Find nakshatra index and corresponding Mahadasha lord
+    nakshatra_index = int(moon_long / (360 / 27))
+    dasha_lord = DASHA_ORDER[nakshatra_index % 9]
+    dasha_years = DASHA_YEARS[dasha_lord]
+
+    # How far Moon has progressed in current nakshatra
+    nak_start = nakshatra_index * (360 / 27)
+    nak_offset = (moon_long - nak_start) / (360 / 27)
+    balance_years = (1 - nak_offset) * dasha_years
+    elapsed_years = dasha_years - balance_years
+
+    # Base: date of birth
+    dob_dt = datetime.strptime(dob, "%Y-%m-%d")
+    current_dasha_start = dob_dt - timedelta(days=elapsed_years * 365.25)
+
+    # Build full Dasha timeline (9 periods)
+    sequence = []
+    dasha_index = DASHA_ORDER.index(dasha_lord)
+    running_date = current_dasha_start
+
+    for i in range(9):
+        lord = DASHA_ORDER[(dasha_index + i) % 9]
+        span = DASHA_YEARS[lord]
+        start = running_date
+        end = start + timedelta(days=span * 365.25)
+        sequence.append({
+            "lord": lord,
+            "start_year": float(start.year + start.month/12 + start.day/365.25),
+            "end_year": float(end.year + end.month/12 + end.day/365.25)
+        })
+        running_date = end
+
+    # Find the current Mahadasha at DOB
+    for dasha in sequence:
+        start_year = dasha['start_year']
+        end_year = dasha['end_year']
+        dob_year = dob_dt.year + dob_dt.month/12 + dob_dt.day/365.25
+        if start_year <= dob_year < end_year:
+            current = dasha
+            years_remaining = end_year - dob_year
+            break
+
+    return {
+        "current_maha_dasha": current["lord"],
+        "years_remaining": round(years_remaining, 2),
+        "sequence": sequence[:3]  # or full 9 if needed
+    }
+
 
 def get_sign_from_longitude(longitude_deg):
     """Determines the zodiac sign for a given sidereal longitude."""
@@ -134,9 +268,109 @@ def convert_to_jd_ut(dt_object_local, latitude, longitude):
     )
     return jd_ut_tuple[1] # jd_ut is the second element
 
+def is_combust(planet: int, sun_long: float, planet_long: float) -> bool:
+    """Check if a planet is combust (too close to the Sun)."""
+    if planet in COMBUSTION_LIMITS:
+        diff = abs(sun_long - planet_long) % 360
+        if diff > 180:
+            diff = 360 - diff
+        return diff < COMBUSTION_LIMITS[planet]
+    return False
+
+def calculate_planet_strengths(jd_ut: float, latitude: float, longitude: float) -> dict:
+    """Calculate planetary strength indicators."""
+    flags = swe.FLG_SWIEPH | swe.FLG_NONUT
+    strength = {}
+
+    # Get ayanamsa
+    ayanamsa = swe.get_ayanamsa_ut(jd_ut)
+
+    # Get Sun longitude for combustion checks
+    sun_data = swe.calc_ut(jd_ut, swe.SUN, flags)
+    sun_long = sun_data[0][0]  # First element of first tuple is longitude
+    sun_sidereal = (sun_long - ayanamsa) % 360
+
+    for planet in [
+        swe.SUN, swe.MOON, swe.MARS, swe.MERCURY,
+        swe.JUPITER, swe.VENUS, swe.SATURN
+    ]:
+        planet_data = swe.calc_ut(jd_ut, planet, flags)
+        long_tropical = planet_data[0][0]  # First element of first tuple is longitude
+        retrograde = planet_data[3][0] < 0 if len(planet_data) > 3 else False  # Speed is fourth element if available
+        sidereal_long = (long_tropical - ayanamsa) % 360
+        sign = get_sign_from_longitude(sidereal_long)
+
+        dignity = "Neutral"
+        if sign == EXALTATION_SIGNS.get(planet):
+            dignity = "Exalted"
+        elif sign == DEBILITATION_SIGNS.get(planet):
+            dignity = "Debilitated"
+        elif sign in OWN_SIGNS.get(planet, []):
+            dignity = "Own Sign"
+
+        strength[str(planet)] = {
+            "name": PLANET_NAMES.get(planet, str(planet)),
+            "sign": sign,
+            "longitude": round(sidereal_long, 2),
+            "dignity": dignity,
+            "retrograde": retrograde,
+            "combust": is_combust(planet, sun_sidereal, sidereal_long)
+        }
+
+    return strength
+
+def get_sidereal_longitude(jd_ut: float, planet: int) -> float:
+    """Get the sidereal longitude of a planet."""
+    flags = swe.FLG_SWIEPH | swe.FLG_NONUT
+    pos = swe.calc_ut(jd_ut, planet, flags)[0][0]
+    ayanamsa = swe.get_ayanamsa_ut(jd_ut)
+    return (pos - ayanamsa) % 360
+
+def calculate_aspects(jd_ut: float) -> dict:
+    """Calculate planetary aspects based on sign positions."""
+    positions = {}
+    aspects = {}
+
+    # Get sign positions for all classical planets
+    for planet in ASPECT_RULES.keys():
+        long = get_sidereal_longitude(jd_ut, planet)
+        positions[planet] = {
+            "longitude": round(long, 2),
+            "sign": int(long // 30)
+        }
+
+    # Loop through planets and apply aspect rules
+    for planet, data in positions.items():
+        planet_sign = data["sign"]
+        aspect_list = []
+
+        for other_planet, other_data in positions.items():
+            if other_planet == planet:
+                continue
+            other_sign = other_data["sign"]
+            sign_diff = (other_sign - planet_sign) % 12
+
+            # Calculate aspects based on traditional rules
+            if planet == swe.JUPITER:  # Jupiter aspects 5th, 7th, and 9th houses
+                if sign_diff in [4, 6, 8]:  # 5th, 7th, 9th house aspects
+                    aspect_list.append(PLANET_NAMES.get(other_planet, str(other_planet)))
+            elif planet == swe.SATURN:  # Saturn aspects 3rd, 7th, and 10th houses
+                if sign_diff in [2, 6, 9]:  # 3rd, 7th, 10th house aspects
+                    aspect_list.append(PLANET_NAMES.get(other_planet, str(other_planet)))
+            elif planet == swe.MARS:  # Mars aspects 4th, 7th, and 8th houses
+                if sign_diff in [3, 6, 7]:  # 4th, 7th, 8th house aspects
+                    aspect_list.append(PLANET_NAMES.get(other_planet, str(other_planet)))
+            else:  # Sun, Moon, Mercury, Venus only aspect 7th house
+                if sign_diff == 6:  # 7th house aspect
+                    aspect_list.append(PLANET_NAMES.get(other_planet, str(other_planet)))
+
+        aspects[PLANET_NAMES.get(planet, str(planet))] = aspect_list
+
+    return aspects
+
 # --- Core Chart Logic ---
 
-def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude: float) -> List[ChartHouse]:
+def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude: float) -> Dict[str, Any]:
     """Calculate D1 (Lagna) chart using Swiss Ephemeris."""
     # Parse date and time
     date_time = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
@@ -149,8 +383,8 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
     
     # Calculate Ascendant with proper flags
     flags = swe.FLG_SWIEPH | swe.FLG_NONUT
-    houses = swe.houses(julian_day, latitude, longitude)
-    ascendant = houses[0][0]  # First cusp (Ascendant)
+    houses_data = swe.houses(julian_day, latitude, longitude)
+    ascendant = houses_data[0][0]  # First element of first tuple is Ascendant
     ascendant_sidereal = (ascendant - ayanamsa) % 360
     ascendant_sign = int(ascendant_sidereal / 30)
 
@@ -158,14 +392,29 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
     planets = {}
     for planet in PLANET_IDS:
         if planet == swe.TRUE_NODE:
-            rahu_pos = swe.calc_ut(julian_day, swe.TRUE_NODE, flags)[0][0]
+            rahu_data = swe.calc_ut(julian_day, swe.TRUE_NODE, flags)
+            rahu_pos = rahu_data[0][0]  # First element of first tuple is longitude
             rahu_sidereal = (rahu_pos - ayanamsa) % 360
             planets[swe.TRUE_NODE] = rahu_sidereal
             ketu_sidereal = (rahu_sidereal + 180) % 360
             planets['KETU'] = ketu_sidereal
         else:
-            planet_pos = swe.calc_ut(julian_day, planet, flags)[0][0]
+            planet_data = swe.calc_ut(julian_day, planet, flags)
+            planet_pos = planet_data[0][0]  # First element of first tuple is longitude
             planets[planet] = (planet_pos - ayanamsa) % 360
+
+    # Calculate Moon's Nakshatra
+    moon_longitude = planets[swe.MOON]
+    nakshatra_info = get_nakshatra_info(moon_longitude)
+
+    # Calculate Vimshottari Dasha
+    dasha_info = calculate_vimshottari_dasha(moon_longitude, dob)
+
+    # Calculate planetary strengths
+    planet_strengths = calculate_planet_strengths(julian_day, latitude, longitude)
+
+    # Calculate planetary aspects
+    aspects = calculate_aspects(julian_day)
 
     # Create chart houses using whole sign system
     houses = []
@@ -189,9 +438,15 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
             planets=", ".join(house_planets) if house_planets else ""
         ))
     
-    return houses
+    return {
+        "houses": houses,
+        "nakshatra": nakshatra_info,
+        "dasha": dasha_info,
+        "planet_strengths": planet_strengths,
+        "aspects": aspects
+    }
 
-def calculate_d9_chart(name: str, dob: str, tob: str, latitude: float, longitude: float) -> List[ChartHouse]:
+def calculate_d9_chart(name: str, dob: str, tob: str, latitude: float, longitude: float) -> Dict[str, Any]:
     """Calculate D9 (Navamsa) chart using Swiss Ephemeris."""
     # Parse date and time
     date_time = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
@@ -202,29 +457,64 @@ def calculate_d9_chart(name: str, dob: str, tob: str, latitude: float, longitude
     # Calculate Ayanamsa
     ayanamsa = swe.get_ayanamsa_ut(julian_day)
     
-    # Calculate Ascendant for D9
+    # Calculate Ascendant with proper flags
     flags = swe.FLG_SWIEPH | swe.FLG_NONUT
-    houses = swe.houses(julian_day, latitude, longitude)
-    ascendant = houses[0][0]  # First cusp (Ascendant)
+    houses_data = swe.houses(julian_day, latitude, longitude)
+    ascendant = houses_data[0][0]  # First element of first tuple is Ascendant
     ascendant_sidereal = (ascendant - ayanamsa) % 360
-    # Multiply by 9 for D9 and get the sign
-    d9_ascendant = (ascendant_sidereal * 9) % 360
-    ascendant_sign = int(d9_ascendant / 30)
+    ascendant_sign = int(ascendant_sidereal / 30)
     
-    # Calculate planet positions for D9
+    # Calculate planet positions (including outer planets and nodes)
     planets = {}
     for planet in PLANET_IDS:
         if planet == swe.TRUE_NODE:
-            rahu_pos = swe.calc_ut(julian_day, swe.TRUE_NODE, flags)[0][0]
-            rahu_sidereal = ((rahu_pos - ayanamsa) * 9) % 360  # Multiply by 9 for D9
+            rahu_data = swe.calc_ut(julian_day, swe.TRUE_NODE, flags)
+            rahu_pos = rahu_data[0][0]  # First element of first tuple is longitude
+            rahu_sidereal = (rahu_pos - ayanamsa) % 360
             planets[swe.TRUE_NODE] = rahu_sidereal
             ketu_sidereal = (rahu_sidereal + 180) % 360
             planets['KETU'] = ketu_sidereal
         else:
-            planet_pos = swe.calc_ut(julian_day, planet, flags)[0][0]
-            planets[planet] = ((planet_pos - ayanamsa) * 9) % 360  # Multiply by 9 for D9
+            planet_data = swe.calc_ut(julian_day, planet, flags)
+            planet_pos = planet_data[0][0]  # First element of first tuple is longitude
+            planets[planet] = (planet_pos - ayanamsa) % 360
 
-    # Create D9 chart houses
+    # Calculate Moon's Nakshatra in D9
+    moon_longitude = (planets[swe.MOON] * 9) % 360  # Multiply by 9 for D9
+    nakshatra_info = get_nakshatra_info(moon_longitude)
+
+    # Calculate planetary strengths for D9
+    planet_strengths = calculate_planet_strengths(julian_day, latitude, longitude)
+
+    # Calculate planetary aspects for D9 based on D9 positions
+    positions = {}
+    aspects = {}
+    for planet in ASPECT_RULES.keys():
+        if planet in planets:
+            d9_long = (planets[planet] * 9) % 360  # Multiply by 9 for D9
+            positions[planet] = {
+                "longitude": round(d9_long, 2),
+                "sign": int(d9_long // 30)
+            }
+
+    # Loop through planets and apply aspect rules
+    for planet, data in positions.items():
+        planet_sign = data["sign"]
+        rules = ASPECT_RULES.get(planet, [])
+        aspect_list = []
+
+        for other_planet, other_data in positions.items():
+            if other_planet == planet:
+                continue
+            other_sign = other_data["sign"]
+            sign_diff = (other_sign - planet_sign) % 12
+
+            if sign_diff in rules:
+                aspect_list.append(PLANET_NAMES.get(other_planet, str(other_planet)))
+
+        aspects[PLANET_NAMES.get(planet, str(planet))] = aspect_list
+
+    # Create chart houses using whole sign system
     houses = []
     for i in range(12):
         sign_num = (ascendant_sign + i) % 12
@@ -234,7 +524,8 @@ def calculate_d9_chart(name: str, dob: str, tob: str, latitude: float, longitude
         # Find planets in this house
         house_planets = []
         for planet, pos in planets.items():
-            if house_start <= pos < house_end:
+            d9_pos = (pos * 9) % 360  # Multiply by 9 for D9
+            if house_start <= d9_pos < house_end:
                 if planet == 'KETU':
                     house_planets.append('Ketu')
                 else:
@@ -246,63 +537,51 @@ def calculate_d9_chart(name: str, dob: str, tob: str, latitude: float, longitude
             planets=", ".join(house_planets) if house_planets else ""
         ))
     
-    return houses
+    return {
+        "houses": houses,
+        "nakshatra": nakshatra_info,
+        "planet_strengths": planet_strengths,
+        "aspects": aspects
+    }
 
 def get_planet_name(planet: int) -> str:
-    """Convert planet number to name."""
-    planet_names = {
-        swe.SUN: "Sun",
-        swe.MOON: "Moon",
-        swe.MARS: "Mars",
-        swe.MERCURY: "Mercury",
-        swe.JUPITER: "Jupiter",
-        swe.VENUS: "Venus",
-        swe.SATURN: "Saturn"
-    }
-    return planet_names.get(planet, "Unknown")
+    """Get the name of a planet from its Swiss Ephemeris ID."""
+    return PLANET_NAMES.get(planet, str(planet))
 
 def get_sign_name(longitude: float) -> str:
-    """Convert longitude to sign name."""
-    signs = [
-        "Aries", "Taurus", "Gemini", "Cancer",
-        "Leo", "Virgo", "Libra", "Scorpio",
-        "Sagittarius", "Capricorn", "Aquarius", "Pisces"
-    ]
-    sign_num = int(longitude / 30)
-    return signs[sign_num]
+    """Get the name of a zodiac sign from a longitude."""
+    sign_index = int(longitude / 30)
+    return ZODIAC_SIGNS[sign_index % 12]
 
 def get_sign_number(sign_name: str) -> int:
-    """Convert sign name to number (1-12)."""
-    signs = {
-        "Aries": 1, "Taurus": 2, "Gemini": 3, "Cancer": 4,
-        "Leo": 5, "Virgo": 6, "Libra": 7, "Scorpio": 8,
-        "Sagittarius": 9, "Capricorn": 10, "Aquarius": 11, "Pisces": 12
-    }
-    return signs.get(sign_name, 1)
-
-# --- Output Formatting ---
+    """Get the number of a zodiac sign (0-11) from its name."""
+    return ZODIAC_SIGNS.index(sign_name)
 
 def print_chart_as_markdown(chart_data, name, chart_type="Lagna"):
-    if not chart_data:
-        return
+    """Print a chart in a markdown table format."""
+    print(f"\n## {name}'s {chart_type} Chart")
+    print("\n| House | Sign | Planets |")
+    print("|-------|------|---------|")
+    for house in chart_data["houses"]:
+        print(f"| {house.house} | {house.sign} | {house.planets or '-'} |")
+    if "nakshatra" in chart_data:
+        print(f"\nMoon's Nakshatra: {chart_data['nakshatra']['nakshatra']} (Pada {chart_data['nakshatra']['pada']})")
+    if "dasha" in chart_data:
+        print("\n### Vimshottari Dasha")
+        print(f"Current Maha Dasha: {chart_data['dasha']['current_maha_dasha']}")
+        print(f"Years Remaining: {chart_data['dasha']['years_remaining']}")
+        print("\nUpcoming Dashas:")
+        for dasha in chart_data['dasha']['sequence']:
+            print(f"- {dasha['lord']}: {dasha['start_year']} to {dasha['end_year']}")
 
-    print(f"## ✅ Your Provided {chart_type} Chart for {name}")
-    print()
-    print("| House | Sign        | Planets              |")
-    print("| ----- | ----------- | -------------------- |")
-    for row in chart_data:
-        print(f"| {row.house:<5} | {row.sign:<11} | {row.planets:<20} |")
-    print("\n---")
-
-# --- Main Execution ---
-
+# Example usage
 if __name__ == "__main__":
-    # Test case based on your example
-    name_kush = "Kush Sharma"
+    # Example data
+    name_kush = "Kush"
     dob_kush = "2003-03-13"
-    tob_kush = "13:00" # Local time
-    latitude_kush = 28.6692  # North
-    longitude_kush = 77.4538 # East
+    tob_kush = "13:00"
+    latitude_kush = 28.6692
+    longitude_kush = 77.4538
 
     # Calculate D1 (Lagna) chart
     d1_chart_kush = calculate_d1_chart(name_kush, dob_kush, tob_kush, latitude_kush, longitude_kush)
@@ -315,12 +594,7 @@ if __name__ == "__main__":
         print_chart_as_markdown(d9_chart_kush, name_kush, "Navamsa (D9)")
 
     print("\n\n--- Notes ---")
-    print("1. Ensure Swiss Ephemeris data files are accessible (see EPHE_PATH or SWEPH_PATH).")
-    print("2. Uses Lahiri Ayanamsa for Vedic calculations.")
-    print("3. Planets include Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu (True), Ketu (True), Uranus, Neptune, Pluto.")
-    print("4. House system is whole sign (Rasi chart), where Lagna sign is the 1st house.")
-    print("5. Timezone is automatically determined from latitude/longitude.")
-    print("   For historical dates, especially before standard timezones, results might need cross-verification.")
-    print("6. Planetary positions from swe.calc_ut are geocentric ecliptical longitude, J2000 if swe.FLG_J2000 used,")
-    print("   otherwise apparent positions (frame of date). For sidereal, this difference is less critical for sign placement.")
-    print("7. D9 (Navamsa) chart is calculated by multiplying the longitude by 9 and finding the resulting sign.")
+    print("1. All calculations use Lahiri Ayanamsa")
+    print("2. D9 chart positions are calculated by multiplying D1 positions by 9")
+    print("3. Ketu is calculated as 180 degrees from Rahu")
+    print("4. Vimshottari Dasha is calculated based on Moon's Nakshatra")

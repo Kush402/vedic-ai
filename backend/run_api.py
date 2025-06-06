@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from astrology.api import router as astrology_router
+from gemini.api import router as gemini_router
 
 app = FastAPI(
     title="Vedic AI API",
@@ -17,8 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include only the astrology router
+# Include routers
 app.include_router(astrology_router, prefix="/api/v1")
+app.include_router(gemini_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

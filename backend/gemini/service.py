@@ -12,8 +12,15 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable not found")
 
+# Configure the API
 genai.configure(api_key=API_KEY)
-MODEL_NAME = "gemini-pro"
+
+# List available models and print them for debugging
+available_models = genai.list_models()
+print("Available models:", [model.name for model in available_models])
+
+# Use the correct model name with the models/ prefix
+MODEL_NAME = "models/gemini-2.0-flash"  # This matches the model name from the available models list
 
 def format_chart_data(label: str, chart_data: List[ChartHouse]) -> str:
     """Format chart data into a markdown table."""
@@ -34,23 +41,12 @@ async def generate_astrology_report(
     navamsa_chart: List[ChartHouse],
     chart_image_base64: Optional[str] = None
 ) -> str:
-    """
-    Generate an astrological report using Gemini AI.
-    
-    Args:
-        name: Client's name
-        dob: Date of birth
-        tob: Time of birth
-        pob: Place of birth
-        lagna_chart: List of houses in the Lagna chart
-        navamsa_chart: List of houses in the Navamsa chart
-        chart_image_base64: Optional base64 encoded chart image
-    
-    Returns:
-        str: Generated report in markdown format
-    """
-    # Format the prompt
-    prompt = f"""
+    try:
+        # Initialize the model
+        model = genai.GenerativeModel(MODEL_NAME)
+        
+        # Format the prompt
+        prompt = f"""
 You are an expert Vedic (Jyotish) astrologer. Generate a comprehensive and insightful astrological report.
 
 ## Client Details:
@@ -73,25 +69,9 @@ Utilize the following precise chart data as your primary basis for analysis:
 
 Generate the report now.
 """
-
-    try:
-        # Initialize the model
-        model = genai.GenerativeModel(MODEL_NAME)
-        
-        # Prepare the content
-        contents = [{"text": prompt}]
-        
-        # Add image if provided
-        if chart_image_base64:
-            contents.append({
-                "inline_data": {
-                    "mime_type": "image/jpeg",
-                    "data": chart_image_base64.split(',')[1] if ',' in chart_image_base64 else chart_image_base64
-                }
-            })
         
         # Generate content
-        response = await model.generate_content_async(contents)
+        response = await model.generate_content_async(prompt)
         
         if not response.text:
             raise ValueError("Empty response from Gemini API")
@@ -99,4 +79,5 @@ Generate the report now.
         return response.text
 
     except Exception as e:
-        raise Exception(f"Failed to generate report: {str(e)}") 
+        print(f"Error details: {str(e)}")  # Add more detailed error logging
+        raise Exception(f"Failed to generate report: {str(e)}")

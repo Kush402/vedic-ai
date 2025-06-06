@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from .service import generate_astrology_report
-from ..astrology.models import ChartHouse
+from astrology.models import ChartHouse
 
 router = APIRouter()
 
