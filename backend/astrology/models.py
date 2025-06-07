@@ -39,13 +39,7 @@ class ChartResponse(BaseModel):
     nakshatra: NakshatraInfo
     dasha: Optional[DashaInfo] = None
     planet_strengths: Optional[Dict[str, PlanetStrength]] = None
-    ascendant: Optional[float] = None
-    aspects: Optional[Dict[str, List[str]]] = None
-
-class CombinedChartResponse(BaseModel):
-    d1_chart: ChartResponse
-    d9_chart: ChartResponse
-    planet_strengths: Dict[str, PlanetStrength]
+    ascendant: Optional[str] = None
     aspects: Optional[Dict[str, List[str]]] = None
 
 class ChartRequest(BaseModel):
