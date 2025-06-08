@@ -371,7 +371,7 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
     
     # Convert to Julian Day UT using proper timezone handling
     julian_day = convert_to_jd_ut(date_time, latitude, longitude)
-
+    
     # Calculate Ayanamsa
     ayanamsa = swe.get_ayanamsa_ut(julian_day)
     
@@ -397,12 +397,11 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
             planet_pos = planet_data[0][0]
             planets[planet] = (planet_pos - ayanamsa) % 360
 
-    # Calculate Moon's Nakshatra
-    moon_longitude = planets[swe.MOON]
-    nakshatra_info = get_nakshatra_info(moon_longitude)
+    # Calculate Ascendant's Nakshatra
+    asc_nakshatra_info = get_nakshatra_info(ascendant_sidereal)
 
     # Calculate Vimshottari Dasha
-    dasha_info = calculate_vimshottari_dasha(moon_longitude, dob)
+    dasha_info = calculate_vimshottari_dasha(planets[swe.MOON], dob)
 
     # Calculate planetary aspects
     positions = {}
@@ -472,7 +471,7 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
     
     return {
         "houses": houses,
-        "nakshatra": nakshatra_info,
+        "nakshatra": asc_nakshatra_info,  # Using ascendant nakshatra instead of moon nakshatra
         "dasha": dasha_info,
         "planet_strengths": None,  # We'll calculate this separately
         "aspects": aspects,

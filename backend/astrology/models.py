@@ -35,6 +35,11 @@ class PlanetStrength(BaseModel):
     combust: bool
 
 class ChartResponse(BaseModel):
+    name: str
+    dob: str
+    tob: str
+    latitude: float
+    longitude: float
     houses: List[ChartHouse]
     nakshatra: NakshatraInfo
     dasha: Optional[DashaInfo] = None

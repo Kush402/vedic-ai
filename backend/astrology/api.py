@@ -32,6 +32,11 @@ async def calculate_charts(request: ChartRequest):
         
         # Create response
         response = ChartResponse(
+            name=request.name,
+            dob=request.dob,
+            tob=request.tob,
+            latitude=request.latitude,
+            longitude=request.longitude,
             houses=result["houses"],
             nakshatra=result["nakshatra"],
             dasha=result["dasha"],
@@ -88,6 +93,15 @@ async def generate_report(request: ChartRequest):
             latitude=request.latitude,
             longitude=request.longitude
         )
+        
+        # Add birth details to chart data
+        chart_data.update({
+            "name": request.name,
+            "dob": request.dob,
+            "tob": request.tob,
+            "latitude": request.latitude,
+            "longitude": request.longitude
+        })
         
         # Generate the report using Gemini API
         report = gemini_api.generate_astrology_report(chart_data)

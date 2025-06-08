@@ -88,6 +88,13 @@ class GeminiAPI:
         ascendant = chart_data.get('ascendant', '')
         nakshatra = chart_data.get('nakshatra', {})
         dasha = chart_data.get('dasha', {})
+        
+        # Extract birth details
+        name = chart_data.get('name', '')
+        dob = chart_data.get('dob', '')
+        tob = chart_data.get('tob', '')
+        latitude = chart_data.get('latitude', '')
+        longitude = chart_data.get('longitude', '')
 
         # Format dasha sequence
         dasha_sequence = []
@@ -98,10 +105,16 @@ class GeminiAPI:
                 )
 
         # Create a structured prompt
-        prompt = f"""Please analyze this Vedic astrology chart and provide a detailed interpretation:
+        prompt = f"""Act as a master Vedic astrologer and analyze this Vedic astrology chart and provide a detailed interpretation of the D1 chart and given properties, make sure to use Current on-going Maha Dasha, also take into account of upcoming astrological events and their impact on the chart.
+
+Birth Details:
+Name: {name}
+Date of Birth: {dob}
+Time of Birth: {tob}
+Location: {latitude}°N, {longitude}°E
 
 Ascendant: {ascendant}
-Nakshatra: {nakshatra.get('name', '')} (Pada {nakshatra.get('pada', '')})
+Nakshatra: {nakshatra.get('nakshatra', '')} (Pada {nakshatra.get('pada', '')})
 
 Planetary Positions:
 {self._format_planets(planets)}
@@ -110,9 +123,6 @@ House Placements:
 {self._format_houses(houses)}
 
 Dasha Periods:
-Current Maha Dasha: {dasha.get('current_maha_dasha', '')}
-Years Remaining: {dasha.get('years_remaining', '')}
-
 Complete Dasha Sequence:
 {chr(10).join(dasha_sequence)}
 
@@ -124,7 +134,7 @@ Please provide:
 5. Current dasha period analysis and its implications
 6. Recommendations for personal growth and development
 
-Please keep the analysis balanced, constructive, and focused on personal growth opportunities."""
+Please keep the analysis real, with no sugar coating, and focused on Self, career, relationships, health, finance, family, children, travel, education."""
 
         return prompt
 
