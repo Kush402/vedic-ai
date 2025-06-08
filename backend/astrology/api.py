@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 from datetime import datetime
 import swisseph as swe
 
@@ -14,6 +14,7 @@ from .models import (
     DashaPeriod,
     PlanetStrength
 )
+from .llm_query import gemini_api
 
 router = APIRouter()
 
@@ -73,4 +74,24 @@ async def health_check():
     """
     Health check endpoint.
     """
-    return {"status": "healthy", "version": "1.0.0"} 
+    return {"status": "healthy", "version": "1.0.0"}
+
+@router.post("/generate-report")
+async def generate_report(request: ChartRequest):
+    """Generate an astrological report using the chart data and Gemini AI."""
+    try:
+        # First get the chart data
+        chart_data = calculate_d1_chart(
+            name=request.name,
+            dob=request.dob,
+            tob=request.tob,
+            latitude=request.latitude,
+            longitude=request.longitude
+        )
+        
+        # Generate the report using Gemini API
+        report = gemini_api.generate_astrology_report(chart_data)
+        
+        return {"report": report}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 
