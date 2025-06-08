@@ -4,6 +4,11 @@ import requests
 from typing import Dict, Any, List
 from fastapi import HTTPException
 from dotenv import load_dotenv
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +31,11 @@ class GeminiAPI:
         try:
             # Format the chart data into a prompt
             prompt = self._format_chart_prompt(chart_data)
+            
+            # Log the prompt being sent to LLM
+            logger.info("=== Prompt sent to LLM ===")
+            logger.info(prompt)
+            logger.info("========================")
             
             # Prepare the request payload
             payload = {
@@ -52,11 +62,20 @@ class GeminiAPI:
             
             # Parse and return the response
             result = response.json()
-            return self._extract_response_text(result)
+            response_text = self._extract_response_text(result)
+            
+            # Log the response from LLM
+            logger.info("=== Response from LLM ===")
+            logger.info(response_text)
+            logger.info("========================")
+            
+            return response_text
 
         except requests.exceptions.RequestException as e:
+            logger.error(f"Error calling Gemini API: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error calling Gemini API: {str(e)}")
         except Exception as e:
+            logger.error(f"Error generating report: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
 
     def _format_chart_prompt(self, chart_data: Dict[str, Any]) -> str:
@@ -70,6 +89,14 @@ class GeminiAPI:
         nakshatra = chart_data.get('nakshatra', {})
         dasha = chart_data.get('dasha', {})
 
+        # Format dasha sequence
+        dasha_sequence = []
+        if 'sequence' in dasha:
+            for period in dasha['sequence']:
+                dasha_sequence.append(
+                    f"- {period['lord']} Dasha: {period['start_year']:.2f} to {period['end_year']:.2f}"
+                )
+
         # Create a structured prompt
         prompt = f"""Please analyze this Vedic astrology chart and provide a detailed interpretation:
 
@@ -82,9 +109,12 @@ Planetary Positions:
 House Placements:
 {self._format_houses(houses)}
 
-Current Dasha Period:
-- Maha Dasha: {dasha.get('current_maha_dasha', '')}
-- Years Remaining: {dasha.get('years_remaining', '')}
+Dasha Periods:
+Current Maha Dasha: {dasha.get('current_maha_dasha', '')}
+Years Remaining: {dasha.get('years_remaining', '')}
+
+Complete Dasha Sequence:
+{chr(10).join(dasha_sequence)}
 
 Please provide:
 1. A general personality analysis based on the ascendant and planetary positions
@@ -119,20 +149,38 @@ Please keep the analysis balanced, constructive, and focused on personal growth 
         return "\n".join(formatted)
 
     def _extract_response_text(self, response: Dict[str, Any]) -> str:
-        """Extract the generated text from the Gemini API response"""
+        """
+        Extract the response text from the Gemini API response
+        """
         try:
-            # Navigate through the response structure to get the generated text
-            candidates = response.get('candidates', [])
-            if not candidates:
-                raise ValueError("No response candidates found")
+            # Get the text from the response
+            text = response.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
             
-            parts = candidates[0].get('content', {}).get('parts', [])
-            if not parts:
-                raise ValueError("No response parts found")
+            # Replace markdown formatting with HTML
+            text = text.replace('**', '<strong>').replace('*', '<em>')
             
-            return parts[0].get('text', '')
+            # Split into sections and format
+            sections = text.split('\n\n')
+            formatted_sections = []
+            
+            for section in sections:
+                if section.strip():
+                    # Handle bullet points
+                    if section.startswith('*'):
+                        points = section.split('\n')
+                        formatted_points = []
+                        for point in points:
+                            if point.strip():
+                                formatted_points.append(f"<li>{point.strip('* ')}</li>")
+                        formatted_sections.append(f"<ul>{''.join(formatted_points)}</ul>")
+                    else:
+                        formatted_sections.append(f"<p>{section}</p>")
+            
+            return ''.join(formatted_sections)
+            
         except Exception as e:
-            raise ValueError(f"Error extracting response text: {str(e)}")
+            logger.error(f"Error extracting response text: {str(e)}")
+            return "Error processing the response"
 
 # Create a singleton instance
 gemini_api = GeminiAPI() 
