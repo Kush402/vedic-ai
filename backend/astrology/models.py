@@ -27,12 +27,13 @@ class DashaInfo(BaseModel):
     sequence: List[Dict[str, Any]]
 
 class PlanetStrength(BaseModel):
-    name: str
     sign: str
     longitude: float
     dignity: str
     retrograde: bool
     combust: bool
+    strength: float
+    condition: str
 
 class ChartResponse(BaseModel):
     name: str
@@ -40,7 +41,7 @@ class ChartResponse(BaseModel):
     houses: List[Dict[str, str]]
     nakshatra: NakshatraInfo
     dasha: DashaInfo
-    planet_strengths: Optional[Dict[str, float]] = None
+    planet_strengths: Optional[Dict[str, PlanetStrength]] = None
     aspects: Dict[str, List[str]]
 
 class ChartRequest(BaseModel):

@@ -29,6 +29,26 @@ def generate_astrology_report(chart_data: Dict[str, Any]) -> Dict[str, str]:
         Dict[str, str]: Generated report sections
     """
     try:
+        # Format planet strengths
+        planet_strengths_text = "\nPlanetary Strengths and Conditions:\n"
+        for planet, details in chart_data['planet_strengths'].items():
+            planet_strengths_text += f"{planet}:\n"
+            planet_strengths_text += f"  - Sign: {details['sign']}\n"
+            planet_strengths_text += f"  - Longitude: {details['longitude']}°\n"
+            planet_strengths_text += f"  - Dignity: {details['dignity']}\n"
+            planet_strengths_text += f"  - Condition: {details['condition']}\n"
+            if details['retrograde']:
+                planet_strengths_text += "  - Retrograde\n"
+            if details['combust']:
+                planet_strengths_text += "  - Combust\n"
+            planet_strengths_text += f"  - Strength: {details['strength']}\n"
+
+        # Format aspects
+        aspects_text = "\nPlanetary Aspects:\n"
+        for planet, aspecting_planets in chart_data['aspects'].items():
+            if aspecting_planets:  # Only show planets that have aspects
+                aspects_text += f"{planet} aspects: {', '.join(aspecting_planets)}\n"
+
         # Create a prompt based on chart data
         prompt = f"""
         Based on the following Vedic astrology chart data, provide a detailed analysis:
@@ -41,13 +61,19 @@ def generate_astrology_report(chart_data: Dict[str, Any]) -> Dict[str, str]:
         House Placements:
         {format_houses(chart_data['houses'])}
         
+        {planet_strengths_text}
+        
+        {aspects_text}
+        
         Please provide a comprehensive analysis including:
         1. Overall personality and life path
         2. Career and professional life
         3. Relationships and family life
         4. Health and well-being
         5. Current dasha period analysis
-        6. Recommendations for personal growth
+        6. Planetary strengths and their impact
+        7. Important aspects and their influence
+        8. Recommendations for personal growth
         """
         
         # Log the prompt being sent to Gemini

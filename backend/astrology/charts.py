@@ -316,54 +316,93 @@ def convert_to_jd_ut(dt_object_local, latitude, longitude):
 
 def is_combust(planet: int, sun_long: float, planet_long: float) -> bool:
     """Check if a planet is combust (too close to the Sun)."""
-    if planet in COMBUSTION_LIMITS:
-        diff = abs(sun_long - planet_long) % 360
-        if diff > 180:
-            diff = 360 - diff
-        return diff < COMBUSTION_LIMITS[planet]
-    return False
+    # Different planets have different combustion ranges
+    combustion_ranges = {
+        swe.MERCURY: 14.0,  # Mercury combust within 14 degrees
+        swe.VENUS: 10.0,    # Venus combust within 10 degrees
+        swe.MARS: 17.0,     # Mars combust within 17 degrees
+        swe.JUPITER: 11.0,  # Jupiter combust within 11 degrees
+        swe.SATURN: 15.0,   # Saturn combust within 15 degrees
+        swe.MOON: 12.0      # Moon combust within 12 degrees
+    }
+    
+    if planet not in combustion_ranges:
+        return False
+        
+    # Calculate angular distance
+    diff = abs(planet_long - sun_long)
+    if diff > 180:
+        diff = 360 - diff
+        
+    return diff <= combustion_ranges[planet]
 
-def calculate_planet_strengths(jd_ut: float, latitude: float, longitude: float) -> dict:
-    """Calculate planetary strength indicators."""
-    flags = swe.FLG_SWIEPH | swe.FLG_NONUT
-    strength = {}
-
-    # Get ayanamsa
-    ayanamsa = swe.get_ayanamsa_ut(jd_ut)
-
-    # Get Sun longitude for combustion checks
-    sun_data = swe.calc_ut(jd_ut, swe.SUN, flags)
-    sun_long = sun_data[0][0]  # First element of first tuple is longitude
-    sun_sidereal = (sun_long - ayanamsa) % 360
-
-    for planet in [
-        swe.SUN, swe.MOON, swe.MARS, swe.MERCURY,
-        swe.JUPITER, swe.VENUS, swe.SATURN
-    ]:
-        planet_data = swe.calc_ut(jd_ut, planet, flags)
-        long_tropical = planet_data[0][0]  # First element of first tuple is longitude
-        retrograde = planet_data[3][0] < 0 if len(planet_data) > 3 else False  # Speed is fourth element if available
-        sidereal_long = (long_tropical - ayanamsa) % 360
-        sign = get_sign_from_longitude(sidereal_long)
-
-        dignity = "Neutral"
-        if sign == EXALTATION_SIGNS.get(planet):
-            dignity = "Exalted"
-        elif sign == DEBILITATION_SIGNS.get(planet):
-            dignity = "Debilitated"
-        elif sign in OWN_SIGNS.get(planet, []):
-            dignity = "Own Sign"
-
-        strength[str(planet)] = {
-            "name": PLANET_NAMES.get(planet, str(planet)),
-            "sign": sign,
-            "longitude": round(sidereal_long, 2),
-            "dignity": dignity,
-            "retrograde": retrograde,
-            "combust": is_combust(planet, sun_sidereal, sidereal_long)
-        }
-
-    return strength
+def calculate_planet_strengths(jd_ut: float, latitude: float, longitude: float) -> Dict[str, Dict[str, Any]]:
+    """Calculate detailed planetary conditions and strengths."""
+    try:
+        # Get ayanamsa
+        ayanamsa = swe.get_ayanamsa_ut(jd_ut)
+        
+        # Get Sun's position for combustion check
+        sun_data = swe.calc_ut(jd_ut, int(PLANET_NUMBERS['Sun']))
+        sun_long = (sun_data[0][0] - ayanamsa) % 360
+        
+        strengths = {}
+        
+        # Calculate for each planet
+        for planet_name, planet_number in PLANET_NUMBERS.items():
+            if planet_name in ['Rahu', 'Ketu']:
+                continue
+                
+            # Get planet position
+            planet_data = swe.calc_ut(jd_ut, int(planet_number))
+            planet_long = (planet_data[0][0] - ayanamsa) % 360
+            is_retrograde = planet_data[0][3] < 0
+            
+            # Check combustion
+            combust = is_combust(int(planet_number), sun_long, planet_long)
+            
+            # Calculate dignity
+            sign_index = int(planet_long // 30)
+            sign = ZODIAC_SIGNS[sign_index]
+            
+            # Determine dignity status
+            dignity = "Neutral"
+            if planet_name in EXALTATION_SIGNS and sign == EXALTATION_SIGNS[planet_name]:
+                dignity = "Exalted"
+            elif planet_name in DEBILITATION_SIGNS and sign == DEBILITATION_SIGNS[planet_name]:
+                dignity = "Debilitated"
+            elif planet_name in OWN_SIGNS and sign in OWN_SIGNS[planet_name]:
+                dignity = "Own Sign"
+            
+            # Calculate numerical strength for reference
+            strength = 0.0
+            if dignity == "Exalted":
+                strength = 1.0
+            elif dignity == "Debilitated":
+                strength = -1.0
+            elif dignity == "Own Sign":
+                strength = 0.5
+                
+            if combust:
+                strength -= 0.5
+            if is_retrograde:
+                strength -= 0.25
+            
+            strengths[planet_name] = {
+                "sign": sign,
+                "longitude": round(planet_long, 2),
+                "dignity": dignity,
+                "retrograde": is_retrograde,
+                "combust": combust,
+                "strength": round(strength, 2),
+                "condition": "Strong" if strength > 0.25 else "Weak" if strength < -0.25 else "Moderate"
+            }
+            
+        return strengths
+        
+    except Exception as e:
+        logger.error(f"Error calculating planet strengths: {str(e)}")
+        raise
 
 def get_sidereal_longitude(jd_ut: float, planet: int) -> float:
     """Get the sidereal longitude of a planet."""
@@ -563,6 +602,9 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
         logger.info(f"Calculated ascendant: {get_sign(asc_sidereal)} {asc_sidereal}°")
         logger.info(f"Calculated planet positions: {planet_positions}")
         
+        # Calculate planet strengths
+        planet_strengths = calculate_planet_strengths(jd, latitude, longitude)
+        
         return {
             "name": name,
             "ascendant": get_sign(asc_sidereal),
@@ -576,7 +618,7 @@ def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude
                 "years_remaining": dasha_result["years_remaining"],
                 "sequence": dasha_result["sequence"]
             },
-            "planet_strengths": None,
+            "planet_strengths": planet_strengths,
             "aspects": aspects
         }
     except Exception as e:
