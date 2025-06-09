@@ -32,7 +32,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ chartData }) => {
   };
 
   return (
-    <div className="report-generator">
+    <div className="report-container">
       <button 
         onClick={generateReport}
         disabled={loading}
@@ -50,13 +50,24 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ chartData }) => {
         />
       )}
 
-      <style jsx>{`
-        .report-generator {
+      <style>{`
+        .report-container {
           padding: 20px;
           max-width: 800px;
           margin: 0 auto;
         }
-
+        .report-section {
+          margin-bottom: 20px;
+        }
+        .report-section h2 {
+          color: #2c3e50;
+          border-bottom: 2px solid #3498db;
+          padding-bottom: 5px;
+        }
+        .report-section p {
+          line-height: 1.6;
+          color: #34495e;
+        }
         .generate-button {
           background-color: #4CAF50;
           color: white;
