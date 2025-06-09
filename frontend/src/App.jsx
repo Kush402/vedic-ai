@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import './App.css';
 
+// Use production backend URL for all API requests
+const API_BASE_URL = 'https://vedic-ai.onrender.com/api/v1';
+
 function App() {
   const [formData, setFormData] = useState({
     name: '',
@@ -41,7 +44,7 @@ function App() {
 
       console.log('Sending data:', requestData); // Debug log
       
-      const response = await fetch('http://localhost:8001/api/v1/charts', {
+      const response = await fetch(`${API_BASE_URL}/charts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +85,7 @@ function App() {
 
       console.log('Sending report request:', requestData); // Debug log
       
-      const response = await fetch('http://localhost:8001/api/v1/generate-report', {
+      const response = await fetch(`${API_BASE_URL}/generate-report`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
