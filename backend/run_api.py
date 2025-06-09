@@ -7,7 +7,11 @@ app = FastAPI(title="Vedic AI API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=[
+        "http://localhost:5173",  # Local development
+        "https://vedic-ai.vercel.app",  # Vercel deployment
+        "https://*.vercel.app"  # Any Vercel preview deployments
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -18,4 +22,4 @@ app.include_router(astrology_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001, reload=False) 
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False) 
