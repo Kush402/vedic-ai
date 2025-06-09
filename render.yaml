@@ -2,15 +2,12 @@ services:
   - type: web
     name: vedic-backend
     env: python
-    plan: free
-    region: oregon
-    buildCommand: |
-      chmod +x backend/download_ephe.sh
-      ./backend/download_ephe.sh
-      pip install -r backend/requirements.txt
-    startCommand: "PYTHONPATH=/app/backend python backend/run_api.py"
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn run_api:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
       - key: SWEPH_PATH
         value: /app/backend/astrology/ephe
       - key: GEMINI_API_KEY
-        sync: false  # This will be set manually in Render dashboard 
+        sync: false 
