@@ -82,7 +82,6 @@ venv/
 ENV/
 
 # Project specific
-backend/ephe/
 *.log
 
 # Environment variables
