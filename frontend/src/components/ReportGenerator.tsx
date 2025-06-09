@@ -11,6 +11,9 @@ interface ReportGeneratorProps {
   };
 }
 
+// Use production backend URL for all API requests
+const API_BASE_URL = 'https://vedic-ai.onrender.com/api/v1';
+
 const ReportGenerator: React.FC<ReportGeneratorProps> = ({ chartData }) => {
   const [report, setReport] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -21,7 +24,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ chartData }) => {
       setLoading(true);
       setError('');
       
-      const response = await axios.post('http://localhost:8001/api/v1/generate-report', chartData);
+      const response = await axios.post(`${API_BASE_URL}/generate-report`, chartData);
       setReport(response.data.report);
     } catch (err) {
       setError('Error generating report. Please try again.');

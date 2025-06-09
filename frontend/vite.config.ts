@@ -7,9 +7,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // For local development, you can use the proxy. In production, this is not needed.
+    // target: 'http://localhost:8001',
     proxy: {
       '/api': {
-        target: 'http://localhost:8001',
+        // For local development, you can use the proxy. In production, this is not needed.
+        // target: 'http://localhost:8001',
         changeOrigin: true,
       },
     },
