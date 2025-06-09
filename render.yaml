@@ -4,7 +4,10 @@ services:
     env: python
     plan: free
     region: oregon
-    buildCommand: "pip install -r backend/requirements.txt"
+    buildCommand: |
+      chmod +x backend/download_ephe.sh
+      ./backend/download_ephe.sh
+      pip install -r backend/requirements.txt
     startCommand: "PYTHONPATH=/app/backend python backend/run_api.py"
     envVars:
       - key: SWEPH_PATH
