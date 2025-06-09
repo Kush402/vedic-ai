@@ -4,48 +4,50 @@ __pycache__/
 *$py.class
 *.so
 .Python
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+.env
+.venv
+venv/
+ENV/
 
 # Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
-.DS_Store
-dist/
-dist-ssr/
-coverage/
-*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Project specific
 backend/ephe/
 *.log
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
 # Environment variables
 .env 
