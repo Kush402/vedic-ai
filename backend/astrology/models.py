@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import List, Optional, Dict
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 
 class Planet(BaseModel):
     name: str
@@ -24,7 +24,7 @@ class DashaPeriod(BaseModel):
 class DashaInfo(BaseModel):
     current_maha_dasha: str
     years_remaining: float
-    sequence: List[DashaPeriod]
+    sequence: List[Dict[str, Any]]
 
 class PlanetStrength(BaseModel):
     name: str
@@ -36,20 +36,15 @@ class PlanetStrength(BaseModel):
 
 class ChartResponse(BaseModel):
     name: str
-    dob: str
-    tob: str
-    latitude: float
-    longitude: float
-    houses: List[ChartHouse]
+    ascendant: str
+    houses: List[Dict[str, str]]
     nakshatra: NakshatraInfo
-    dasha: Optional[DashaInfo] = None
-    planet_strengths: Optional[Dict[str, PlanetStrength]] = None
-    ascendant: Optional[str] = None
-    aspects: Optional[Dict[str, List[str]]] = None
+    dasha: DashaInfo
+    planet_strengths: Optional[Dict[str, float]] = None
+    aspects: Dict[str, List[str]]
 
 class ChartRequest(BaseModel):
-    name: str
-    dob: str  # Format: YYYY-MM-DD
-    tob: str  # Format: HH:MM
-    latitude: float
-    longitude: float 
+    name: str = Field(..., description="Full name of the person")
+    dob: str = Field(..., description="Date of birth in YYYY-MM-DD format")
+    tob: str = Field(..., description="Time of birth in HH:MM format (24-hour)")
+    location: str = Field(..., description="Place of birth (e.g., 'New Delhi, India')") 

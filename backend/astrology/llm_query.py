@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
+import google.generativeai as genai
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -14,6 +15,70 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
+# Configure Gemini API
+genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+
+def generate_astrology_report(chart_data: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Generate an astrological report using Gemini AI based on chart data.
+    
+    Args:
+        chart_data (Dict[str, Any]): The calculated chart data
+        
+    Returns:
+        Dict[str, str]: Generated report sections
+    """
+    try:
+        # Create a prompt based on chart data
+        prompt = f"""
+        Based on the following Vedic astrology chart data, provide a detailed analysis:
+        
+        Name: {chart_data['name']}
+        Ascendant: {chart_data['ascendant']}
+        Moon Nakshatra: {chart_data['nakshatra']['nakshatra']} (Pada {chart_data['nakshatra']['pada']})
+        Current Dasha: {chart_data['dasha']['current_maha_dasha']} ({chart_data['dasha']['years_remaining']} years remaining)
+        
+        House Placements:
+        {format_houses(chart_data['houses'])}
+        
+        Please provide a comprehensive analysis including:
+        1. Overall personality and life path
+        2. Career and professional life
+        3. Relationships and family life
+        4. Health and well-being
+        5. Current dasha period analysis
+        6. Recommendations for personal growth
+        """
+        
+        # Log the prompt being sent to Gemini
+        logger.info("Sending prompt to Gemini:\n%s", prompt)
+        
+        # Generate response using Gemini
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        response = model.generate_content(prompt)
+        
+        # Log the response from Gemini
+        logger.info("Received response from Gemini:\n%s", response.text)
+        
+        # Parse and structure the response
+        report = {
+            "overall_analysis": response.text,
+            "chart_data": chart_data
+        }
+        
+        return report
+        
+    except Exception as e:
+        logger.error(f"Error generating astrology report: {str(e)}")
+        raise
+
+def format_houses(houses: list) -> str:
+    """Format house data for the prompt."""
+    return "\n".join([
+        f"House {i+1}: {house['sign']} {house['planets']}"
+        for i, house in enumerate(houses)
+    ])
+
 class GeminiAPI:
     def __init__(self):
         self.api_key = os.getenv('GEMINI_API_KEY')
@@ -21,94 +86,62 @@ class GeminiAPI:
         self.headers = {
             'Content-Type': 'application/json'
         }
-
-    def generate_astrology_report(self, chart_data: Dict[str, Any]) -> str:
-        """
-        Generate an astrology report using the chart data
-        """
         if not self.api_key:
-            return "Gemini API key not configured. Please set GEMINI_API_KEY environment variable to enable AI-generated reports."
+            logger.warning("GEMINI_API_KEY not found in environment variables")
 
+    def generate_astrology_report(self, chart_data: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Generate an astrological report using Gemini AI based on chart data.
+        
+        Args:
+            chart_data (Dict[str, Any]): The calculated chart data
+            
+        Returns:
+            Dict[str, str]: Generated report sections
+        """
         try:
-            # Format the prompt with complete chart data
-            prompt = f"""Act as a master Vedic astrologer and analyze this Vedic astrology chart and provide a detailed interpretation of the D1 chart and given properties, make sure to use Current on-going Maha Dasha, also take into account of upcoming astrological events and their impact on the chart.
-
-Current Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Birth Details:
-Name: {chart_data['name']}
-Date of Birth: {chart_data['dob']}
-Time of Birth: {chart_data['tob']}
-Location: {chart_data['latitude']}°N, {chart_data['longitude']}°E
-
-Ascendant: {chart_data['ascendant']}
-Nakshatra: {chart_data['nakshatra']['nakshatra']} (Pada {chart_data['nakshatra']['pada']})
-
-Planetary Positions and House Placements:
-{self.format_house_placements(chart_data['houses'])}
-
-Dasha Periods:
-Current Maha Dasha: {chart_data['dasha']['current_maha_dasha']}
-Years Remaining: {chart_data['dasha']['years_remaining']}
-
-Complete Dasha Sequence:
-{self.format_dasha_sequence(chart_data['dasha']['sequence'])}
-
-Please provide:
-1. A general personality analysis based on the ascendant and planetary positions
-2. Key strengths and challenges indicated by the chart
-3. Career and life path insights
-4. Relationship dynamics
-5. Current dasha period analysis and its implications
-6. Recommendations for personal growth and development
-
-Please keep the analysis real, with no sugar coating, and focused on Self, career, relationships, health, finance, family, children, travel, education."""
-
-            # Log the prompt being sent to LLM
-            logger.info("=== Prompt sent to LLM ===")
-            logger.info(prompt)
-            logger.info("========================")
+            # Create a prompt based on chart data
+            prompt = f"""
+            Based on the following Vedic astrology chart data, provide a detailed analysis:
             
-            # Prepare the request payload
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {
-                                "text": prompt
-                            }
-                        ]
-                    }
-                ]
+            Name: {chart_data['name']}
+            Ascendant: {chart_data['ascendant']}
+            Moon Nakshatra: {chart_data['nakshatra']['nakshatra']} (Pada {chart_data['nakshatra']['pada']})
+            Current Dasha: {chart_data['dasha']['current_maha_dasha']} ({chart_data['dasha']['years_remaining']} years remaining)
+            
+            House Placements:
+            {self.format_houses(chart_data['houses'])}
+            
+            Please provide a comprehensive analysis including:
+            1. Overall personality and life path
+            2. Career and professional life
+            3. Relationships and family life
+            4. Health and well-being
+            5. Current dasha period analysis
+            6. Recommendations for personal growth
+            """
+            
+            # Log the prompt being sent to Gemini
+            logger.info("Sending prompt to Gemini:\n%s", prompt)
+            
+            # Generate response using Gemini
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content(prompt)
+            
+            # Log the response from Gemini
+            logger.info("Received response from Gemini:\n%s", response.text)
+            
+            # Parse and structure the response
+            report = {
+                "overall_analysis": response.text,
+                "chart_data": chart_data
             }
-
-            # Make the API request
-            response = requests.post(
-                f"{self.base_url}?key={self.api_key}",
-                headers=self.headers,
-                json=payload
-            )
-
-            # Check for successful response
-            response.raise_for_status()
             
-            # Parse and return the response
-            result = response.json()
-            response_text = self._extract_response_text(result)
+            return report
             
-            # Log the response from LLM
-            logger.info("=== Response from LLM ===")
-            logger.info(response_text)
-            logger.info("========================")
-            
-            return response_text
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error calling Gemini API: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error calling Gemini API: {str(e)}")
         except Exception as e:
-            logger.error(f"Error generating report: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+            logger.error(f"Error generating astrology report: {str(e)}")
+            raise
 
     def _format_chart_prompt(self, chart_data: Dict[str, Any]) -> str:
         """
@@ -251,6 +284,13 @@ Please keep the analysis real, with no sugar coating, and focused on Self, caree
         for dasha in sequence:
             formatted.append(f"- {dasha['lord']} Dasha: {dasha['start_year']:.2f} to {dasha['end_year']:.2f}")
         return "\n".join(formatted)
+
+    def format_houses(self, houses: list) -> str:
+        """Format house data for the prompt."""
+        return "\n".join([
+            f"House {i+1}: {house['sign']} {house['planets']}"
+            for i, house in enumerate(houses)
+        ])
 
 # Create a singleton instance
 gemini_api = GeminiAPI() 
