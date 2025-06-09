@@ -1,10 +1,13 @@
 services:
   - type: web
     name: vedic-backend
-    env: docker
+    env: python
     plan: free
     region: oregon
-    dockerfilePath: ./Dockerfile
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "python backend/run_api.py"
     envVars:
+      - key: SWEPH_PATH
+        value: ./backend/astrology/ephe
       - key: GEMINI_API_KEY
         sync: false  # This will be set manually in Render dashboard 
