@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Use VITE_API_URL for backend connection (set in Vercel and .env)
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 interface ChartRequest {
   name: string;
