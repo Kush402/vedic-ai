@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vedic-backend.onrender.com/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface ChartRequest {
   name: string;
@@ -33,7 +33,7 @@ interface ReportResponse {
 
 export const generateChart = async (data: ChartRequest): Promise<ChartResponse> => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/charts`, data);
+    const response = await axios.post(`${API_BASE_URL}/api/v1/charts`, data);
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -45,7 +45,7 @@ export const generateChart = async (data: ChartRequest): Promise<ChartResponse> 
 
 export const generateReport = async (data: ChartRequest): Promise<ReportResponse> => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/generate-report`, data);
+    const response = await axios.post(`${API_BASE_URL}/api/v1/generate-report`, data);
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {

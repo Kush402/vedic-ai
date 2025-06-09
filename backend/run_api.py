@@ -9,7 +9,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Local development
-        "https://vedic-ai.vercel.app",  # Vercel deployment
+        "https://vedic-ai-snowy.vercel.app",  # Vercel frontend
+        "https://vedic-ai.onrender.com",      # Render backend (self-calls)
         "https://*.vercel.app"  # Any Vercel preview deployments
     ],
     allow_credentials=True,
