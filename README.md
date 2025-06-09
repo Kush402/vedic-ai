@@ -1,93 +1,138 @@
-# Vedic Astrology Report Generator
+# Vedic AI - Vedic Astrology Analysis Platform
 
-A web application that generates detailed Vedic astrology reports based on birth details. The application uses Python for the backend and React for the frontend.
+A modern web application that provides detailed Vedic astrology analysis using Swiss Ephemeris calculations and AI-powered interpretations.
 
 ## Features
 
-- Input birth details (name, date of birth, time of birth, latitude, longitude)
-- Generate comprehensive Vedic astrology reports
-- Beautiful and responsive user interface
-- Detailed analysis of planetary positions and their effects
-- Career and life path insights
-- Relationship dynamics analysis
-- Current Dasha period analysis
-- Personal growth recommendations
+- **Accurate Planetary Calculations**: Uses Swiss Ephemeris for precise planetary positions
+- **D1 Chart Analysis**: Complete birth chart calculation with house placements
+- **Vimshottari Dasha**: Accurate dasha period calculations
+- **AI-Powered Reports**: Detailed astrological interpretations using Gemini AI
+- **Modern UI**: Clean and intuitive user interface built with React and TypeScript
 
 ## Tech Stack
 
 ### Backend
-- Python
+- Python 3.9+
 - FastAPI
-- Google Gemini AI for report generation
-- Vedic astrology calculations
+- Swiss Ephemeris
+- Gemini AI API
+- Pydantic for data validation
 
 ### Frontend
-- React
+- React 18
 - TypeScript
 - Vite
-- Axios for API calls
-- Modern CSS styling
+- Tailwind CSS
+- React Router
 
-## Setup
+## Project Structure
+
+```
+vedic/
+├── backend/
+│   ├── astrology/
+│   │   ├── api.py           # FastAPI routes
+│   │   │   ├── charts.py        # Chart calculations
+│   │   │   ├── llm_query.py     # AI report generation
+│   │   │   └── models.py        # Data models
+│   │   ├── ephe/                # Swiss Ephemeris files
+│   │   └── run_api.py           # API server
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   │   ├── charts.py          # Chart components
+│   │   │   ├── pages/          # Page components
+│   │   │   ├── services/       # API services
+│   │   │   └── types/          # TypeScript types
+│   │   └── package.json
+└── setup.sh                 # Installation script
+```
+
+## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/vedic.git
-cd vedic
+git clone https://github.com/Kush402/vedic-ai.git
+cd vedic-ai
 ```
 
-2. Set up the backend:
+2. Run the setup script:
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+This will:
+- Create a Python virtual environment
+- Install backend dependencies
+- Download Swiss Ephemeris files
+- Install frontend dependencies
+- Set up environment variables
+
+## Running the Application
+
+1. Start the backend server:
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uvicorn run_api:app --reload --port 8001
 ```
 
-3. Set up the frontend:
-```bash
-cd frontend
-npm install
-```
-
-4. Start the development servers:
-
-Backend:
-```bash
-cd backend
-uvicorn main:app --reload
-```
-
-Frontend:
+2. Start the frontend development server:
 ```bash
 cd frontend
 npm run dev
 ```
 
-5. Open http://localhost:5173 in your browser
+The application will be available at:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8001
 
-## Usage
+## API Endpoints
 
-1. Enter your birth details in the form:
-   - Name
-   - Date of Birth
-   - Time of Birth
-   - Latitude
-   - Longitude
+### `/api/v1/charts`
+- **Method**: POST
+- **Description**: Calculate D1 chart
+- **Request Body**:
+  ```json
+  {
+    "name": "string",
+    "dob": "YYYY-MM-DD",
+    "tob": "HH:MM",
+    "latitude": number,
+    "longitude": number
+  }
+  ```
 
-2. Click "Generate Report" to get your personalized Vedic astrology report
+### `/api/v1/generate-report`
+- **Method**: POST
+- **Description**: Generate AI-powered astrological report
+- **Request Body**: Same as charts endpoint
 
-3. The report will include:
-   - Planetary positions and their effects
-   - Career and life path insights
-   - Relationship dynamics
-   - Current Dasha period analysis
-   - Personal growth recommendations
+## Environment Variables
+
+Create a `.env` file in the backend directory:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+SWEPH_PATH=path_to_ephemeris_files
+```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Swiss Ephemeris for accurate astronomical calculations
+- Google Gemini AI for astrological interpretations
+- FastAPI for the robust backend framework
+- React and Vite for the modern frontend
