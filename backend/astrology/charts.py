@@ -7,6 +7,26 @@ from timezonefinder import TimezoneFinder
 from typing import List, Dict, Any
 from .models import ChartHouse, NakshatraInfo, DashaInfo, DashaPeriod
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Define planet numbers for Swiss Ephemeris
+PLANET_NUMBERS = {
+    'Sun': swe.SUN,
+    'Moon': swe.MOON,
+    'Mercury': swe.MERCURY,
+    'Venus': swe.VENUS,
+    'Mars': swe.MARS,
+    'Jupiter': swe.JUPITER,
+    'Saturn': swe.SATURN,
+    'Rahu': swe.MEAN_NODE,  # Mean Node for Rahu
+    'Uranus': swe.URANUS,
+    'Neptune': swe.NEPTUNE,
+    'Pluto': swe.PLUTO
+}
 
 # --- Configuration & Constants ---
 
@@ -159,56 +179,88 @@ def get_nakshatra_info(longitude: float) -> dict:
 
 from datetime import datetime, timedelta
 
-def calculate_vimshottari_dasha(moon_long: float, dob: str) -> dict:
-    """Returns current Maha Dasha and sequence from birth using Moon longitude."""
-    # Find nakshatra index and corresponding Mahadasha lord
-    nakshatra_index = int(moon_long / (360 / 27))
-    dasha_lord = DASHA_ORDER[nakshatra_index % 9]
-    dasha_years = DASHA_YEARS[dasha_lord]
-
-    # How far Moon has progressed in current nakshatra
-    nak_start = nakshatra_index * (360 / 27)
-    nak_offset = (moon_long - nak_start) / (360 / 27)
-    balance_years = (1 - nak_offset) * dasha_years
-    elapsed_years = dasha_years - balance_years
-
-    # Base: date of birth
-    dob_dt = datetime.strptime(dob, "%Y-%m-%d")
-    current_dasha_start = dob_dt - timedelta(days=elapsed_years * 365.25)
-
-    # Build full Dasha timeline (9 periods)
-    sequence = []
-    dasha_index = DASHA_ORDER.index(dasha_lord)
-    running_date = current_dasha_start
-
-    for i in range(9):
-        lord = DASHA_ORDER[(dasha_index + i) % 9]
-        span = DASHA_YEARS[lord]
-        start = running_date
-        end = start + timedelta(days=span * 365.25)
-        sequence.append({
-            "lord": lord,
-            "start_year": float(start.year + start.month/12 + start.day/365.25),
-            "end_year": float(end.year + end.month/12 + end.day/365.25)
-        })
-        running_date = end
-
-    # Find the current Mahadasha at DOB
-    for dasha in sequence:
-        start_year = dasha['start_year']
-        end_year = dasha['end_year']
-        dob_year = dob_dt.year + dob_dt.month/12 + dob_dt.day/365.25
-        if start_year <= dob_year < end_year:
-            current = dasha
-            years_remaining = end_year - dob_year
-            break
-
-    return {
-        "current_maha_dasha": current["lord"],
-        "years_remaining": round(years_remaining, 2),
-        "sequence": sequence[:3]  # or full 9 if needed
-    }
-
+def calculate_vimshottari_dasha(moon_long: float, dob: str) -> Dict[str, Any]:
+    """Calculate Vimshottari dasha periods based on Moon's longitude."""
+    try:
+        # Parse date of birth
+        dob_dt = datetime.strptime(dob, "%Y-%m-%d")
+        
+        # Get current date
+        current_date = datetime.now()
+        
+        # Calculate nakshatra and pada
+        nakshatra, pada = get_nakshatra_pada(moon_long)
+        
+        # Get dasha lord for the nakshatra
+        dasha_lord = get_dasha_lord_from_nakshatra(nakshatra)
+        
+        # Calculate offset within nakshatra (0-13.333333 degrees)
+        nak_offset = (moon_long % 13.333333) / 13.333333
+        
+        # Vimshottari dasha periods (in years)
+        dasha_periods = {
+            'Ketu': 7,
+            'Venus': 20,
+            'Sun': 6,
+            'Moon': 10,
+            'Mars': 7,
+            'Rahu': 18,
+            'Jupiter': 16,
+            'Saturn': 19,
+            'Mercury': 17
+        }
+        
+        # Calculate balance of first dasha
+        dasha_years = dasha_periods[dasha_lord]
+        balance_years = (1 - nak_offset) * dasha_years
+        elapsed_years = dasha_years - balance_years
+        
+        # Calculate start date of first dasha
+        current_dasha_start = dob_dt - timedelta(days=elapsed_years * 365.25)
+        
+        # Calculate sequence of dashas
+        dasha_sequence = []
+        current_date_float = current_dasha_start.year + (current_dasha_start.month - 1) / 12 + (current_dasha_start.day - 1) / 365.25
+        
+        # Get the order of dasha lords starting from the birth dasha
+        dasha_lords = list(dasha_periods.keys())
+        start_index = dasha_lords.index(dasha_lord)
+        ordered_lords = dasha_lords[start_index:] + dasha_lords[:start_index]
+        
+        # Calculate sequence
+        for lord in ordered_lords:
+            years = dasha_periods[lord]
+            end_date_float = current_date_float + years
+            dasha_sequence.append({
+                "lord": lord,
+                "start_year": current_date_float,
+                "end_year": end_date_float
+            })
+            current_date_float = end_date_float
+            
+            # If we've covered the current year, we can stop
+            if end_date_float > current_date.year:
+                break
+        
+        # Find current dasha and remaining years
+        current_dasha = None
+        years_remaining = 0
+        current_year_float = current_date.year + (current_date.month - 1) / 12 + (current_date.day - 1) / 365.25
+        
+        for dasha in dasha_sequence:
+            if dasha["start_year"] <= current_year_float < dasha["end_year"]:
+                current_dasha = dasha["lord"]
+                years_remaining = dasha["end_year"] - current_year_float
+                break
+        
+        return {
+            "current_maha_dasha": current_dasha,
+            "years_remaining": years_remaining,
+            "sequence": dasha_sequence
+        }
+    except Exception as e:
+        logger.error(f"Error calculating Vimshottari dasha: {str(e)}")
+        raise
 
 def get_sign_from_longitude(longitude_deg):
     """Determines the zodiac sign for a given sidereal longitude."""
@@ -364,120 +416,172 @@ def calculate_aspects(jd_ut: float) -> dict:
 
 # --- Core Chart Logic ---
 
-def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude: float) -> Dict[str, Any]:
-    """Calculate D1 (Lagna) chart using Swiss Ephemeris."""
-    # Parse date and time
-    date_time = datetime.strptime(f"{dob} {tob}", "%Y-%m-%d %H:%M")
-    
-    # Convert to Julian Day UT using proper timezone handling
-    julian_day = convert_to_jd_ut(date_time, latitude, longitude)
-
-    # Calculate Ayanamsa
-    ayanamsa = swe.get_ayanamsa_ut(julian_day)
-    
-    # Calculate Ascendant with proper flags
-    flags = swe.FLG_SWIEPH | swe.FLG_NONUT
-    houses_data = swe.houses(julian_day, latitude, longitude)
-    ascendant = houses_data[0][0]  # First element of first tuple is Ascendant
-    ascendant_sidereal = (ascendant - ayanamsa) % 360
-    ascendant_sign = int(ascendant_sidereal / 30)
-    
-    # Calculate planet positions (including outer planets and nodes)
-    planets = {}
-    for planet in PLANET_IDS:
-        if planet == swe.TRUE_NODE:
-            rahu_data = swe.calc_ut(julian_day, swe.TRUE_NODE, flags)
-            rahu_pos = rahu_data[0][0]
-            rahu_sidereal = (rahu_pos - ayanamsa) % 360
-            planets[swe.TRUE_NODE] = rahu_sidereal
-            ketu_sidereal = (rahu_sidereal + 180) % 360
-            planets['KETU'] = ketu_sidereal
-        else:
-            planet_data = swe.calc_ut(julian_day, planet, flags)
-            planet_pos = planet_data[0][0]
-            planets[planet] = (planet_pos - ayanamsa) % 360
-
-    # Calculate Moon's Nakshatra
-    moon_longitude = planets[swe.MOON]
-    nakshatra_info = get_nakshatra_info(moon_longitude)
-
-    # Calculate Vimshottari Dasha
-    dasha_info = calculate_vimshottari_dasha(moon_longitude, dob)
-
-    # Calculate planetary aspects
-    positions = {}
-    aspects = {}
-    for planet in ASPECT_RULES.keys():
-        if planet in planets:
-            positions[planet] = {
-                "longitude": round(planets[planet], 2),
-                "sign": int(planets[planet] / 30)
-            }
-
-    # Calculate aspects
-    for planet, data in positions.items():
-        planet_sign = data["sign"]
-        rules = ASPECT_RULES.get(planet, [])
-        aspect_list = []
-
-        for other_planet, other_data in positions.items():
-            if other_planet == planet:
-                continue
-            other_sign = other_data["sign"]
-            sign_diff = (other_sign - planet_sign) % 12
-
-            if sign_diff in rules:
-                aspect_list.append(PLANET_NAMES.get(other_planet, str(other_planet)))
-
-        aspects[PLANET_NAMES.get(planet, str(planet))] = aspect_list
-
-    # Create chart houses
-    houses = []
-    for i in range(12):
-        sign_num = (ascendant_sign + i) % 12
-        sign_name = ZODIAC_SIGNS[sign_num]
-        
-        # Find planets in this house
-        house_planets = []
-        for planet, pos in planets.items():
-            planet_sign = int(pos / 30)
-            if planet_sign == sign_num:
-                if planet == 'KETU':
-                    house_planets.append('Ketu')
-                else:
-                    house_planets.append(PLANET_NAMES.get(planet, str(planet)))
-        
-        # Sort planets in the order they appear in PLANET_NAMES
-        sorted_planets = []
-        for planet_id in PLANET_IDS:
-            planet_name = PLANET_NAMES.get(planet_id, str(planet_id))
-            if planet_name in house_planets:
-                sorted_planets.append(planet_name)
-        if 'Ketu' in house_planets:
-            sorted_planets.append('Ketu')
-        
-        houses.append(ChartHouse(
-            house=f"{i+1}st",
-            sign=sign_name,
-            planets=", ".join(sorted_planets) if sorted_planets else ""
-        ))
-    
-    # Debug information
-    print(f"Debug - Ascendant: {ascendant_sidereal}° ({ZODIAC_SIGNS[ascendant_sign]})")
-    print("Debug - Planet Positions:")
-    for planet, pos in planets.items():
-        planet_name = PLANET_NAMES.get(planet, str(planet))
-        planet_sign = int(pos / 30)
-        print(f"{planet_name}: {pos}° ({ZODIAC_SIGNS[planet_sign]})")
-    
-    return {
-        "houses": houses,
-        "nakshatra": nakshatra_info,
-        "dasha": dasha_info,
-        "planet_strengths": None,  # We'll calculate this separately
-        "aspects": aspects,
-        "ascendant": ZODIAC_SIGNS[ascendant_sign]  # Added ascendant
+def get_dasha_lord_from_nakshatra(nakshatra: str) -> str:
+    """Get the dasha lord based on nakshatra."""
+    nakshatra_dasha_map = {
+        'Ashwini': 'Ketu',
+        'Bharani': 'Venus',
+        'Krittika': 'Sun',
+        'Rohini': 'Moon',
+        'Mrigashira': 'Mars',
+        'Ardra': 'Rahu',
+        'Punarvasu': 'Jupiter',
+        'Pushya': 'Saturn',
+        'Ashlesha': 'Mercury',
+        'Magha': 'Ketu',
+        'Purva Phalguni': 'Venus',
+        'Uttara Phalguni': 'Sun',
+        'Hasta': 'Moon',
+        'Chitra': 'Mars',
+        'Swati': 'Rahu',
+        'Vishakha': 'Jupiter',
+        'Anuradha': 'Saturn',
+        'Jyeshtha': 'Mercury',
+        'Mula': 'Ketu',
+        'Purva Ashadha': 'Venus',
+        'Uttara Ashadha': 'Sun',
+        'Shravana': 'Moon',
+        'Dhanishta': 'Mars',
+        'Shatabhisha': 'Rahu',
+        'Purva Bhadrapada': 'Jupiter',
+        'Uttara Bhadrapada': 'Saturn',
+        'Revati': 'Mercury'
     }
+    return nakshatra_dasha_map.get(nakshatra)
+
+def calculate_d1_chart(name: str, dob: str, tob: str, latitude: float, longitude: float) -> Dict[str, Any]:
+    """Calculate D1 (Rashi) chart using Swiss Ephemeris with Whole Sign House system."""
+    try:
+        # Parse date and time
+        dt_str = f"{dob} {tob}"
+        try:
+            # Try parsing as 24-hour format first
+            dt_object_local = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+        except ValueError:
+            # If that fails, try 12-hour format
+            dt_object_local = datetime.strptime(dt_str, "%Y-%m-%d %I:%M")
+            
+        logger.info(f"Parsed datetime: {dt_object_local}")
+        
+        # Convert to UTC
+        utc_dt = convert_to_utc(dt_object_local, latitude, longitude)
+        
+        # Convert to Julian day
+        jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, 
+                       utc_dt.hour + utc_dt.minute/60.0)
+        
+        # Calculate planet positions
+        planet_positions = {}
+        nakshatras = []
+        
+        # First calculate Rahu's position
+        rahu_data = swe.calc_ut(jd, int(PLANET_NUMBERS['Rahu']))
+        rahu_pos = (rahu_data[0][0] - swe.get_ayanamsa_ut(jd)) % 360
+        planet_positions['Rahu'] = rahu_pos
+        planet_positions['Ketu'] = (rahu_pos + 180) % 360
+        
+        # Calculate other planet positions
+        for planet_name, planet_number in PLANET_NUMBERS.items():
+            if planet_name in ['Rahu', 'Ketu']:
+                continue
+                
+            # Calculate tropical position
+            planet_data = swe.calc_ut(jd, int(planet_number))
+            tropical_pos = planet_data[0][0]
+            ayanamsa = swe.get_ayanamsa_ut(jd)
+            
+            # Convert to sidereal
+            sidereal_pos = (tropical_pos - ayanamsa) % 360
+            planet_positions[planet_name] = sidereal_pos
+            
+            # Calculate nakshatra
+            nakshatra, pada = get_nakshatra_pada(sidereal_pos)
+            nakshatras.append({
+                "planet": planet_name,
+                "nakshatra": nakshatra,
+                "pada": pada,
+                "sign": get_sign(sidereal_pos),
+                "degree": sidereal_pos
+            })
+        
+        # Calculate ascendant using Whole Sign system
+        asc_tropical = swe.houses(jd, latitude, longitude)[0][0]
+        ayanamsa = swe.get_ayanamsa_ut(jd)
+        asc_sidereal = (asc_tropical - ayanamsa) % 360
+        asc_sign_index = int(asc_sidereal // 30)
+        
+        # Initialize house data
+        houses = []
+        house_planets = {i: [] for i in range(12)}  # 0 = house 1
+        
+        # Assign planets to houses based on their sign
+        for planet, lon in planet_positions.items():
+            sign_index = int(lon // 30)
+            rel_house_index = (sign_index - asc_sign_index) % 12
+            house_planets[rel_house_index].append(planet)
+        
+        # Generate house data
+        for i in range(12):
+            sign_index = (asc_sign_index + i) % 12
+            sign_name = ZODIAC_SIGNS[sign_index]
+            planets_in_house = house_planets[i]
+            houses.append({
+                "house": f"{i+1}st",
+                "sign": sign_name,
+                "planets": ", ".join(planets_in_house) if planets_in_house else ""
+            })
+        
+        # Calculate aspects
+        aspects = {}
+        for p1_name, p1_pos in planet_positions.items():
+            aspects[p1_name] = []
+            for p2_name, p2_pos in planet_positions.items():
+                if p1_name != p2_name:
+                    diff = abs(p1_pos - p2_pos)
+                    if diff > 180:
+                        diff = 360 - diff
+                    
+                    # Check for major aspects
+                    if abs(diff - 0) < 8:  # Conjunction
+                        aspects[p1_name].append(p2_name)
+                    elif abs(diff - 60) < 8:  # Sextile
+                        aspects[p1_name].append(p2_name)
+                    elif abs(diff - 90) < 8:  # Square
+                        aspects[p1_name].append(p2_name)
+                    elif abs(diff - 120) < 8:  # Trine
+                        aspects[p1_name].append(p2_name)
+                    elif abs(diff - 180) < 8:  # Opposition
+                        aspects[p1_name].append(p2_name)
+        
+        # Get Moon's nakshatra and position
+        moon_nakshatra = next(n["nakshatra"] for n in nakshatras if n["planet"] == "Moon")
+        moon_long = planet_positions["Moon"]
+        
+        # Calculate dashas properly using moon longitude
+        dasha_result = calculate_vimshottari_dasha(moon_long, dob)
+        
+        logger.info(f"Calculated ascendant: {get_sign(asc_sidereal)} {asc_sidereal}°")
+        logger.info(f"Calculated planet positions: {planet_positions}")
+        
+        return {
+            "name": name,
+            "ascendant": get_sign(asc_sidereal),
+            "houses": houses,
+            "nakshatra": {
+                "nakshatra": moon_nakshatra,
+                "pada": next(n["pada"] for n in nakshatras if n["planet"] == "Moon")
+            },
+            "dasha": {
+                "current_maha_dasha": dasha_result["current_maha_dasha"],
+                "years_remaining": dasha_result["years_remaining"],
+                "sequence": dasha_result["sequence"]
+            },
+            "planet_strengths": None,
+            "aspects": aspects
+        }
+    except Exception as e:
+        logger.error(f"Error calculating D1 chart: {str(e)}")
+        raise
 
 def get_planet_name(planet: int) -> str:
     """Get the name of a planet from its Swiss Ephemeris ID."""
@@ -508,6 +612,39 @@ def print_chart_as_markdown(chart_data, name, chart_type="Lagna"):
         print("\nUpcoming Dashas:")
         for dasha in chart_data['dasha']['sequence']:
             print(f"- {dasha['lord']}: {dasha['start_year']} to {dasha['end_year']}")
+
+def convert_to_utc(dt_object_local: datetime, latitude: float, longitude: float) -> datetime:
+    """Convert local datetime to UTC."""
+    try:
+        # Get timezone from coordinates
+        tf = TimezoneFinder()
+        timezone_str = tf.timezone_at(lat=latitude, lng=longitude)
+        if not timezone_str:
+            raise ValueError(f"Could not determine timezone for coordinates: {latitude}, {longitude}")
+        
+        # Convert to UTC
+        local_tz = pytz.timezone(timezone_str)
+        local_dt = local_tz.localize(dt_object_local)
+        utc_dt = local_dt.astimezone(pytz.UTC)
+        
+        logger.info(f"Converted datetime {dt_object_local} to UTC {utc_dt}")
+        return utc_dt
+    except Exception as e:
+        logger.error(f"Error converting datetime to UTC: {str(e)}")
+        raise
+
+def get_nakshatra_pada(longitude: float) -> tuple[str, int]:
+    """Calculate Nakshatra and Pada from longitude."""
+    nak_index = int(longitude // 13.3333)
+    nakshatra = NAKSHATRAS[nak_index]
+    offset_in_nak = longitude % 13.3333
+    pada = int(offset_in_nak // 3.3333) + 1
+    return nakshatra, pada
+
+def get_sign(longitude: float) -> str:
+    """Get sign name from longitude."""
+    sign_index = int(longitude // 30)
+    return ZODIAC_SIGNS[sign_index]
 
 # Example usage
 if __name__ == "__main__":

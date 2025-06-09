@@ -5,6 +5,7 @@ from typing import Dict, Any, List
 from fastapi import HTTPException
 from dotenv import load_dotenv
 import logging
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,9 +30,40 @@ class GeminiAPI:
             return "Gemini API key not configured. Please set GEMINI_API_KEY environment variable to enable AI-generated reports."
 
         try:
-            # Format the chart data into a prompt
-            prompt = self._format_chart_prompt(chart_data)
-            
+            # Format the prompt with complete chart data
+            prompt = f"""Act as a master Vedic astrologer and analyze this Vedic astrology chart and provide a detailed interpretation of the D1 chart and given properties, make sure to use Current on-going Maha Dasha, also take into account of upcoming astrological events and their impact on the chart.
+
+Current Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Birth Details:
+Name: {chart_data['name']}
+Date of Birth: {chart_data['dob']}
+Time of Birth: {chart_data['tob']}
+Location: {chart_data['latitude']}°N, {chart_data['longitude']}°E
+
+Ascendant: {chart_data['ascendant']}
+Nakshatra: {chart_data['nakshatra']['nakshatra']} (Pada {chart_data['nakshatra']['pada']})
+
+Planetary Positions and House Placements:
+{self.format_house_placements(chart_data['houses'])}
+
+Dasha Periods:
+Current Maha Dasha: {chart_data['dasha']['current_maha_dasha']}
+Years Remaining: {chart_data['dasha']['years_remaining']}
+
+Complete Dasha Sequence:
+{self.format_dasha_sequence(chart_data['dasha']['sequence'])}
+
+Please provide:
+1. A general personality analysis based on the ascendant and planetary positions
+2. Key strengths and challenges indicated by the chart
+3. Career and life path insights
+4. Relationship dynamics
+5. Current dasha period analysis and its implications
+6. Recommendations for personal growth and development
+
+Please keep the analysis real, with no sugar coating, and focused on Self, career, relationships, health, finance, family, children, travel, education."""
+
             # Log the prompt being sent to LLM
             logger.info("=== Prompt sent to LLM ===")
             logger.info(prompt)
@@ -191,6 +223,34 @@ Please keep the analysis real, with no sugar coating, and focused on Self, caree
         except Exception as e:
             logger.error(f"Error extracting response text: {str(e)}")
             return "Error processing the response"
+
+    def format_house_placements(self, houses: List[Dict[str, str]]) -> str:
+        """Format house placements for the prompt."""
+        formatted = []
+        for house in houses:
+            # Extract house number and convert to integer
+            house_num = int(house['house'].rstrip('stndrdth'))
+            
+            # Format house number with correct suffix
+            if house_num == 1:
+                house_str = "1st"
+            elif house_num == 2:
+                house_str = "2nd"
+            elif house_num == 3:
+                house_str = "3rd"
+            else:
+                house_str = f"{house_num}th"
+                
+            planets = house['planets'] if house['planets'] else "No planets"
+            formatted.append(f"House {house_str} ({house['sign']}): {planets}")
+        return "\n".join(formatted)
+
+    def format_dasha_sequence(self, sequence: List[Dict[str, Any]]) -> str:
+        """Format dasha sequence for the prompt."""
+        formatted = []
+        for dasha in sequence:
+            formatted.append(f"- {dasha['lord']} Dasha: {dasha['start_year']:.2f} to {dasha['end_year']:.2f}")
+        return "\n".join(formatted)
 
 # Create a singleton instance
 gemini_api = GeminiAPI() 
