@@ -10,9 +10,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Local development
         "https://vedic-ai-snowy.vercel.app",  # Old Vercel frontend
-        "https://vedic-ai-alpha.vercel.app",  # New Vercel frontend
+        "https://vedic-ai-alpha.vercel.app",  # Previous Vercel frontend
+        "https://vedic-ai-iumc.vercel.app",   # NEW: Current Vercel frontend
         "https://vedic-ai.onrender.com",      # Render backend (self-calls)
-        "https://*.vercel.app"  # Any Vercel preview deployments
+        "https://*.vercel.app"                # Any Vercel preview deployments
     ],
     allow_credentials=True,
     allow_methods=["*"],
