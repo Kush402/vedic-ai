@@ -2,20 +2,15 @@
 
 A Vedic astrology application with AI-powered chart analysis.
 
-## Environment Variables
+## Live Deployment
 
-### Frontend (Vercel)
+You can try the live app here:
 
-Set these environment variables in your Vercel project settings:
+- **Frontend:** [https://vedic-ai-iumc.vercel.app/](https://vedic-ai-iumc.vercel.app/)
 
-- `VITE_API_URL`: Backend API URL (e.g., `https://vedic-backend.onrender.com/api/v1`)
+## Project Overview
 
-### Backend (Render)
-
-Set these environment variables in your Render project settings:
-
-- `GEMINI_API_KEY`: Your Google Gemini API key
-- `SWEPH_PATH`: Path to Swiss Ephemeris files (automatically set in Dockerfile)
+Vedic AI is a modern web application that generates Vedic astrology charts and provides AI-powered analysis. Users can enter their birth details to receive a detailed astrological chart and an AI-generated report.
 
 ## Project Structure
 
@@ -61,52 +56,9 @@ vedic-ai/
    npm run dev
    ```
 
-### Backend Setup
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-
-2. Create and activate virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Start the API server:
-   ```bash
-   python run_api.py
-   ```
-
 ## Development
 
 - Frontend runs on `http://localhost:5173`
-- Backend API runs on `http://localhost:8000`
-
-## Deployment
-
-### Frontend (Vercel)
-
-1. Connect your GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy
-
-### Backend (Render)
-
-1. Connect your GitHub repository to Render
-2. Set environment variables in Render dashboard
-3. Deploy
-
-## API Endpoints
-
-- `GET /api/v1/health`: Health check
-- `POST /api/v1/charts`: Generate birth chart
-- `POST /api/v1/generate-report`: Generate AI analysis report
 
 ## License
 
